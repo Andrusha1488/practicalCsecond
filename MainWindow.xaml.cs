@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,100 +14,85 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using Newtonsoft.Json;
 
-namespace practic1
+namespace practicheskaya2
 {
-    public partial class MainWindow : Window
+    public class Note
     {
-        private bool playerXTurn = true;
-        private bool gameEnded = false;
-        private List<Button> buttons;
+        public string Title { get; set; }
+        public string Description { get; set; }
+        public DateTime Date { get; set; }
+    }
 
-        public MainWindow()
+    public class DataSerializer
+    {
+        public void Serialize<T>(List<T> data, string filePath)
         {
-            InitializeComponent();
-            buttons = new List<Button> { btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9 };
+            string jsonData = JsonConvert.SerializeObject(data);
+            File.WriteAllText(filePath, jsonData);
         }
-        private void Button_Click(object sender, RoutedEventArgs e)
+
+        public List<T> Deserialize<T>(string filePath)
         {
-            if (!gameEnded)
+            if (File.Exists(filePath))
             {
-                var button = (Button)sender;
-                if (button.Content == null)
-                {
-                    button.Content = playerXTurn ? "X" : "O";
-                    playerXTurn = !playerXTurn;
-                    button.IsEnabled = false;
-                    CheckForWinner();
-                    if (!gameEnded && !playerXTurn)
-                    {
-                        MakeRobotMove();
-                    }
-                }
+                string jsonData = File.ReadAllText(filePath);
+                return JsonConvert.DeserializeObject<List<T>>(jsonData);
+            }
+            else
+            {
+                return new List<T>();
             }
         }
+    }
 
-        private void MakeRobotMove()
+    public class DailyPlannerViewModel
+    {
+        private List<Note> notes;
+        private DataSerializer serializer;
+        private string filePath = "notes.json";
+
+        public DailyPlannerViewModel()
         {
-            Random random = new Random();
-            int index = random.Next(buttons.Count);
-            while (buttons[index].Content != null)
-            {
-                index = random.Next(buttons.Count);
-            }
-            buttons[index].Content = "O";
-            buttons[index].IsEnabled = false;
-            playerXTurn = true;
-            CheckForWinner();
+            serializer = new DataSerializer();
+            LoadNotes();
         }
 
-        private void btnRestart_Click(object sender, RoutedEventArgs e)
+        public List<Note> Notes
         {
-            RestartGame();
+            get { return notes; }
+            set { notes = value; }
         }
 
-        private void RestartGame()
+        private void LoadNotes()
         {
-            foreach (var button in buttons)
-            {
-                button.Content = null;
-                button.IsEnabled = true;
-            }
-            gameEnded = false;
-            playerXTurn = true;
+            notes = serializer.Deserialize<Note>(filePath);
         }
 
-        private void CheckForWinner()
+        public void SaveNotes()
         {
-            if ((btn1.Content != null && btn1.Content == btn2.Content && btn2.Content == btn3.Content) ||
-                (btn4.Content != null && btn4.Content == btn5.Content && btn5.Content == btn6.Content) ||
-                (btn7.Content != null && btn7.Content == btn8.Content && btn8.Content == btn9.Content) ||
-                (btn1.Content != null && btn1.Content == btn4.Content && btn4.Content == btn7.Content) ||
-                (btn2.Content != null && btn2.Content == btn5.Content && btn5.Content == btn8.Content) ||
-                (btn3.Content != null && btn3.Content == btn6.Content && btn6.Content == btn9.Content) ||
-                (btn1.Content != null && btn1.Content == btn5.Content && btn5.Content == btn9.Content) ||
-                (btn3.Content != null && btn3.Content == btn5.Content && btn5.Content == btn7.Content))
-            {
-                gameEnded = true;
-                MessageBox.Show(playerXTurn ? "Нолики победили" : "Крестики победили");
-                DisableButtons();
-            }
-            else if (!buttons.Exists(b => b.Content == null))
-            {
-                gameEnded = true;
-                MessageBox.Show("Ничья");
-                DisableButtons();
-            }
+            serializer.Serialize(notes, filePath);
         }
 
-        private void DisableButtons()
+        public void AddOrUpdateNote(Note note)
         {
-            foreach (var button in buttons)
+            int index = notes.FindIndex(n => n.Date == note.Date);
+            if (index != -1)
             {
-                button.IsEnabled = false;
+                notes[index] = note;
             }
+            else
+            {
+                notes.Add(note);
+            }
+            SaveNotes();
         }
 
-
+        public void DeleteNote(Note note)
+        {
+            notes.Remove(note);
+            SaveNotes();
+        }
     }
 }
